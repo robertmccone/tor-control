@@ -4,6 +4,9 @@ client/dist/
 # Tor's DataDirectory for the private instance this app spawns.
 .tor-data/
 
+# Claude folder
+.claude/
+
 # Contains onion private keys — never commit.
 data/
 
