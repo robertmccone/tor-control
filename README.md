@@ -4,6 +4,9 @@ A local web UI for creating and managing Tor v3 hidden services. Give a site a
 name, click create, and get back a `.onion` address with a QR code — the folder,
 starter page, port mapping and static file server are all set up for you.
 
+Note: This project is mostly generated using Claude Code with little direct 
+human programming.
+
 ## Requirements
 
 - Node.js 18+
