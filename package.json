@@ -1,0 +1,21 @@
+{
+  "name": "torcontrol",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local web UI for creating and managing Tor hidden services",
+  "scripts": {
+    "dev": "concurrently -n server,client -c magenta,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "node --watch server/index.js",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "start": "node server/index.js",
+    "install:all": "npm install && npm --prefix client install"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
