@@ -48,6 +48,25 @@ export class TorProcess extends EventEmitter {
     this.emit('status', this.state);
   }
 
+  /**
+   * Summarise why tor quit, from the lines it logged on the way out. Only
+   * [err]/[warn] lines carry the cause; the timestamp and level prefix are
+   * dropped so the message reads well in the UI.
+   */
+  _exitReason() {
+    const notable = this.logLines
+      .slice(-25)
+      .filter((line) => /\[(err|warn)\]/.test(line))
+      .map((line) => line.replace(/^.*?\[(?:err|warn)\]\s*/, '').trim())
+      .filter(Boolean);
+    if (!notable.length) return null;
+
+    // Deduplicate while preserving order; tor repeats itself across retries.
+    const seen = new Set();
+    const unique = notable.filter((line) => !seen.has(line) && seen.add(line));
+    return unique.slice(0, 3).join(' / ');
+  }
+
   async start() {
     if (this.child) return;
 
@@ -59,6 +78,15 @@ export class TorProcess extends EventEmitter {
     await fs.chmod(this.dataDir, 0o700);
 
     const args = [
+      // Without -f, tor reads /etc/tor/torrc, so the private instance inherits
+      // the *system* tor's configuration. That is not merely untidy: a distro
+      // torrc commonly declares a HiddenServiceDir under /var/lib/tor owned by
+      // debian-tor and mode 0700. Reading it as an unprivileged user fails,
+      // config validation fails with it, and tor exits immediately with code 1
+      // before the control port ever opens. Point at our own file instead and
+      // tolerate its absence, so the app is unaffected by the host's torrc.
+      '-f', path.join(this.dataDir, 'torrc'),
+      '--ignore-missing-torrc',
       '--DataDirectory', this.dataDir,
       '--ControlPort', String(this.controlPort),
       '--CookieAuthentication', '1',
@@ -94,7 +122,14 @@ export class TorProcess extends EventEmitter {
       }
       this.bootstrapProgress = 0;
       if (this.status !== 'stopping' && this.status !== 'stopped') {
-        this.lastError = `tor exited unexpectedly (code ${code}, signal ${signal})`;
+        // A bare exit code is not actionable. Tor explains itself on stdout
+        // just before quitting, so quote those lines: a bad config, a busy
+        // control port and a rejected DataDirectory all exit 1 and are only
+        // distinguishable from the log.
+        const reason = this._exitReason();
+        this.lastError = reason
+          ? `tor exited unexpectedly (code ${code}, signal ${signal}): ${reason}`
+          : `tor exited unexpectedly (code ${code}, signal ${signal})`;
       }
       this._setStatus('stopped');
     });
@@ -107,8 +142,22 @@ export class TorProcess extends EventEmitter {
       this._setStatus('error');
     });
 
+    // A config error kills tor in well under a second. Waiting for the exit
+    // event here turns the 30s polling timeout into an immediate, accurate
+    // failure; the race is what previously reduced a clear tor error message
+    // to a generic "could not reach the control port".
+    const earlyExit = new Promise((resolve) => {
+      child.once('exit', () => resolve('exited'));
+    });
+
     try {
-      await this._connectControl();
+      const outcome = await Promise.race([
+        this._connectControl().then(() => 'connected'),
+        earlyExit,
+      ]);
+      if (outcome === 'exited') {
+        throw new Error(this.lastError || 'tor exited before the control port was ready');
+      }
       await this._awaitBootstrap();
     } catch (err) {
       this.lastError = err.message;

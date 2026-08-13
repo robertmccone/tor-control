@@ -12,9 +12,16 @@ human programming.
 - Node.js 18+
 - The `tor` binary on `PATH` (`sudo apt install tor` on Debian/Ubuntu)
 
-No root access is needed and nothing in `/etc/tor` is modified. The app spawns
-its **own** private Tor instance on control port `9151` with a `DataDirectory`
-inside the project, so a system-wide Tor keeps running untouched.
+No root access is needed and nothing in `/etc/tor` is read or modified. The app
+spawns its **own** private Tor instance on control port `9151` with a
+`DataDirectory` inside the project, so a system-wide Tor keeps running
+untouched.
+
+The child Tor is started with `-f .tor-data/torrc --ignore-missing-torrc`, so it
+never inherits `/etc/tor/torrc`. This matters: a distro torrc that declares a
+`HiddenServiceDir` under `/var/lib/tor` (owned by `debian-tor`, mode `0700`)
+cannot be read by an unprivileged user, and Tor would refuse to start at all.
+Drop a `torrc` into `.tor-data/` if you want to pass extra options.
 
 ## Setup
 
