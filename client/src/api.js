@@ -18,8 +18,9 @@ async function request(url, options = {}) {
 export const api = {
   status: () => request('/api/status'),
   listSites: () => request('/api/sites'),
-  createSite: (name, serve) =>
-    request('/api/sites', { method: 'POST', body: JSON.stringify({ name, serve }) }),
+  // `port` is optional: null lets the server allocate one.
+  createSite: (name, serve, port = null) =>
+    request('/api/sites', { method: 'POST', body: JSON.stringify({ name, serve, port }) }),
   deleteSite: (id, deleteFiles) =>
     request(`/api/sites/${id}?deleteFiles=${deleteFiles ? 'true' : 'false'}`, {
       method: 'DELETE',

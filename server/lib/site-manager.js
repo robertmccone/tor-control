@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { allocatePort } from './ports.js';
+import { allocatePort, claimPort } from './ports.js';
 import { defaultIndexHtml } from './default-content.js';
 
 /** Turn a display name into a safe directory name. */
@@ -102,7 +102,7 @@ export class SiteManager {
     }
   }
 
-  async create({ name, serve = true }) {
+  async create({ name, serve = true, port: requestedPort = null }) {
     const validationError = validateName(name);
     if (validationError) throw Object.assign(new Error(validationError), { status: 400 });
 
@@ -111,8 +111,14 @@ export class SiteManager {
       throw Object.assign(new Error(`A site named "${trimmed}" already exists`), { status: 409 });
     }
 
+    // Settle the port before reserving a directory: a rejected port should not
+    // leave an empty site folder behind.
+    const port =
+      requestedPort == null
+        ? await allocatePort(this._takenPorts())
+        : await claimPort(requestedPort, this._takenPorts());
+
     const { dir, slug } = await this._reserveDir(slugify(trimmed));
-    const port = await allocatePort(this._takenPorts());
     const id = crypto.randomUUID();
 
     await fs.writeFile(path.join(dir, 'index.html'), defaultIndexHtml(trimmed), 'utf8');

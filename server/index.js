@@ -95,8 +95,20 @@ app.post('/api/sites', async (req, res) => {
     if (tor.status !== 'running') {
       throw Object.assign(new Error('Tor is not running yet'), { status: 409 });
     }
-    const { name, serve } = req.body ?? {};
-    const result = await manager.create({ name, serve: serve !== false });
+    const { name, serve, port } = req.body ?? {};
+    // An omitted, null or blank port means "pick one for me".
+    let requestedPort = null;
+    if (port !== undefined && port !== null && port !== '') {
+      requestedPort = Number(port);
+      if (!Number.isInteger(requestedPort)) {
+        throw Object.assign(new Error('Port must be a whole number'), { status: 400 });
+      }
+    }
+    const result = await manager.create({
+      name,
+      serve: serve !== false,
+      port: requestedPort,
+    });
     broadcast('sites', { sites: manager.listPublic() });
     res.status(201).json(result);
   } catch (err) {

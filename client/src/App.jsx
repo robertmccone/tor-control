@@ -110,10 +110,10 @@ export default function App() {
     }
   }, []);
 
-  const handleCreate = async (name, serve) => {
+  const handleCreate = async (name, serve, port) => {
     setCreating(true);
     try {
-      const { site, warning } = await api.createSite(name, serve);
+      const { site, warning } = await api.createSite(name, serve, port);
       await refreshSites();
       if (warning) pushToast(`Site created, but serving failed: ${warning}`);
       else pushToast(`“${site.name}” is live at ${site.onion}`, 'success');
